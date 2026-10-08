@@ -74,9 +74,13 @@ Do not output the JSON until you have all 5 pieces of information.
 def parse_preferences(text):
     match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
     if match:
+        json_str = match.group(1)
+        # Remove trailing commas which break standard json.loads
+        json_str = re.sub(r',\s*\}', '}', json_str)
         try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            st.error(f"Failed to parse preferences. The AI generated invalid JSON: {json_str}")
             return None
     return None
 
@@ -127,8 +131,10 @@ if st.session_state.chat_session is None:
 
 # Display Chat History (hide JSON if it exists)
 for message in st.session_state.messages:
-    # Don't show the raw JSON block to the user
-    display_text = re.sub(r'```json\s*(\{.*?\})\s*```', '*(Computing your matches...)*', message["content"], flags=re.DOTALL)
+    display_text = message["content"]
+    # Only hide the raw JSON block if we successfully parsed the preferences
+    if st.session_state.preferences is not None:
+        display_text = re.sub(r'```json\s*(\{.*?\})\s*```', '*(Computing your matches...)*', display_text, flags=re.DOTALL)
     if display_text.strip():
         with st.chat_message(message["role"]):
             st.markdown(display_text)
